@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from openai import OpenAI
+import sys
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 # -----------------------------
 # Load API Keys
@@ -77,17 +81,65 @@ def email_tool(crm_df: pd.DataFrame):
     
     if "generated_email" in st.session_state:
             st.write("### ✉️ Generated Email Draft: ", st.session_state.generated_email)
-    if st.button("Send Email"):
-        st.write(f"Sending email to {email_select}")
-
+    if st.button("Send Email", key="send_email_btn"):
+        st.warning("🚀 Send Email button clicked!")  # <— should always appear
+        print("🚀 Send Email button clicked!")       # <— should appear in terminal
+        sys.stdout.flush()
+        send_email(
+            email_select,
+            "Introduction & Collaboration Opportunity",
+            st.session_state.get("generated_email", "test")
+        )
     return
 
-    
+# -----------------------------
+# Send Email
+# -----------------------------
+def send_email(to_email, subject, body_text):
+    """Send an email using SendGrid and show results in both UI and console."""
+    load_dotenv()
+    SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 
-    if st.button("Send Email"):
-        st.write(f"Sending email to {email_select}")
+    if not SENDGRID_API_KEY:
+        st.error("❌ Missing SendGrid API key in .env file.")
+        print("❌ Missing SendGrid API key in .env file.")
+        sys.stdout.flush()
+        return
 
-    return
+    # Debug info
+    print("📧 DEBUG EMAIL DATA:")
+    print(f"FROM: nikhilkhattar2004@gmail.com")
+    print(f"TO:   {to_email}")
+    print(f"SUBJECT: {subject}")
+    print(f"BODY LENGTH: {len(body_text)} characters")
+    sys.stdout.flush()
+
+    message = Mail(
+        from_email="nikhilkhattar2004@gmail.com",  # must be verified sender
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body_text
+    )
+
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+
+        if response.status_code in [200, 202]:
+            # Streamlit UI feedback
+            st.success(f"✅ Email sent successfully to {to_email} (Status {response.status_code})")
+
+            # Console feedback
+            print(f"✅ Email sent successfully to {to_email} (Status {response.status_code})")
+        else:
+            st.error(f"❌ Failed to send email. Status: {response.status_code}")
+            print(f"❌ Failed to send email. Status: {response.status_code}")
+
+    except Exception as e:
+        st.error(f"SendGrid Error: {e}")
+        print(f"❌ SendGrid Error: {e}")
+
+    sys.stdout.flush()  # force log output to appear immediately
 
 
 # -----------------------------
